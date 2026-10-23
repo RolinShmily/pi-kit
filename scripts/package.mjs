@@ -1,16 +1,47 @@
+import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
-const config = readJson(join(root, "kit.config.json"));
+const rawConfig = readJson(join(root, "kit.config.json"));
 const current = readJson(join(root, "package.json"));
+const scope = rawConfig.name?.startsWith("@") ? `${rawConfig.name.split("/")[0]}/` : "";
 const hostPeers = Object.fromEntries([
   "@earendil-works/pi-ai", "@earendil-works/pi-agent-core",
   "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui", "typebox",
 ].map((name) => [name, "*"]));
-const resourceTypes = ["extensions", "skills", "prompts", "themes"];
+
+function normalizeExtension(id, item = {}) {
+  const directory = id;
+  const promptsDir = `${directory}/prompts`;
+  const prompts = Array.isArray(item.prompts)
+    ? item.prompts
+    : existsSync(join(root, promptsDir))
+      ? [promptsDir]
+      : [];
+  return {
+    id,
+    name: item.name ?? `${scope}${id}`,
+    version: item.version ?? rawConfig.version,
+    bundle: Boolean(item.bundle),
+    publish: Boolean(item.publish),
+    entry: item.entry ?? `${directory}/index.ts`,
+    readme: item.readme ?? `${directory}/README.md`,
+    files: item.files ?? [directory],
+    prompts,
+    deps: Array.isArray(item.deps) ? item.deps : [],
+    exports: item.exports && typeof item.exports === "object" ? item.exports : undefined,
+  };
+}
+
+const config = {
+  ...rawConfig,
+  extensions: Object.fromEntries(
+    Object.entries(rawConfig.extensions ?? {}).map(([id, item]) => [id, normalizeExtension(id, item)]),
+  ),
+};
 
 function sourcePath(path) {
   if (typeof path !== "string" || path.length === 0 || isAbsolute(path)) {
@@ -38,68 +69,39 @@ function validateConfig() {
   assertRelease(config, "kit");
   for (const [id, item] of Object.entries(config.extensions)) {
     assertRelease(item, id);
-    if (typeof item.bundle !== "boolean") throw new Error(`${id}.bundle must be boolean`);
+    if (item.entry !== `${id}/index.ts`) throw new Error(`${id}.entry must be ${id}/index.ts`);
+    if (item.readme !== `${id}/README.md`) throw new Error(`${id}.readme must be ${id}/README.md`);
     sourcePath(item.entry);
-    if (!Array.isArray(item.files) || item.files.length === 0) throw new Error(`${id}.files must list its source and runtime assets`);
+    sourcePath(item.readme);
     for (const path of item.files) sourcePath(path);
-    if (!item.files.some((path) => item.entry === path || item.entry.startsWith(`${path}/`))) {
-      throw new Error(`${id}.files does not contain its entry`);
+    for (const path of item.prompts) sourcePath(path);
+    for (const depId of item.deps) {
+      if (!config.extensions[depId]) throw new Error(`${id}.deps references unknown extension '${depId}'`);
+    }
+    if (item.exports) {
+      for (const target of Object.values(item.exports)) {
+        sourcePath(join(id, target.replace(/^\.\//, "")));
+      }
     }
   }
-  for (const [id, item] of Object.entries(config.forks)) {
-    assertRelease(item, id);
-    if (typeof item.bundle !== "boolean") throw new Error(`${id}.bundle must be boolean`);
-    sourcePath(item.path);
-    sourcePath(`${item.path}/package.json`);
-    if (!item.upstream) throw new Error(`${id} must identify its upstream`);
-  }
-  for (const path of config.prompts) sourcePath(path);
-}
-
-function addDependencies(target, dependencies = {}) {
-  for (const [name, version] of Object.entries(dependencies)) {
-    if (name in hostPeers) throw new Error(`${name} must be a peerDependency supplied by Pi`);
-    if (target[name] && target[name] !== version) throw new Error(`Conflicting dependency versions for ${name}`);
-    target[name] = version;
-  }
-}
-
-function forkResources(item) {
-  const manifest = readJson(sourcePath(`${item.path}/package.json`));
-  if (!manifest.pi) throw new Error(`${item.path} must declare its Pi resources explicitly`);
-  const pi = Object.fromEntries(resourceTypes.map((type) => [type, (manifest.pi[type] ?? []).map((path) => {
-    // Keeping fork paths explicit prevents silently losing nested resources.
-    if (/[!*?]/.test(path) || path.startsWith("+") || path.startsWith("-")) {
-      throw new Error(`Fork manifest patterns require explicit adaptation: ${item.path}: ${path}`);
-    }
-    const prefixed = `${item.path}/${path.replace(/^\.\//, "")}`;
-    sourcePath(prefixed);
-    return `./${prefixed}`;
-  })]));
-  return { manifest, pi };
 }
 
 function kitManifest() {
-  const pi = { extensions: [], skills: [], prompts: config.prompts.map((path) => `./${path}`), themes: [] };
-  const files = ["THIRD_PARTY.md", ...config.prompts];
-  const dependencies = {};
+  const pi = { extensions: [], skills: [], prompts: [], themes: [] };
+  const files = [...Object.values(config.extensions).map((item) => item.readme)];
   for (const item of Object.values(config.extensions).filter((item) => item.bundle)) {
     pi.extensions.push(`./${item.entry}`);
+    pi.prompts.push(...item.prompts.map((path) => `./${path}`));
     files.push(...item.files);
+    for (const depId of item.deps) {
+      files.push(...config.extensions[depId].files);
+    }
   }
-  for (const item of Object.values(config.forks).filter((item) => item.bundle)) {
-    const fork = forkResources(item);
-    files.push(item.path);
-    for (const type of resourceTypes) pi[type].push(...fork.pi[type]);
-    addDependencies(dependencies, fork.manifest.dependencies);
-  }
-  const result = {
+  return {
     ...current, name: config.name, version: config.version, description: config.description,
-    files: [...new Set(files), "!**/test/**", "!**/tests/**", "!**/*.{test,spec}.{ts,js,mjs,cjs}", "!**/.env", "!**/.env.*"], peerDependencies: hostPeers, pi,
+    files: [...new Set(files), "!**/test/**", "!**/tests/**", "!**/*.{test,spec}.{ts,js,mjs,cjs}", "!**/.env", "!**/.env.*"],
+    peerDependencies: hostPeers, pi,
   };
-  delete result.dependencies;
-  if (Object.keys(dependencies).length) result.dependencies = dependencies;
-  return result;
 }
 
 function shouldCopy(path) {
@@ -109,47 +111,182 @@ function shouldCopy(path) {
     && !/\.(?:test|spec)\.[cm]?[jt]s$/.test(path);
 }
 
-function stage(kind, id, item, manifest, files) {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`Invalid release id: ${id}`);
-  const output = join(root, "dist", kind, id);
-  // Only generated output for this exact release target is replaced.
-  rmSync(output, { recursive: true, force: true });
-  mkdirSync(output, { recursive: true });
-  for (const path of files) {
-    const destination = join(output, path);
-    mkdirSync(dirname(destination), { recursive: true });
-    cpSync(sourcePath(path), destination, { recursive: true, filter: shouldCopy });
+function resolveCrossExtensionSpecifier(sourceAbsolute, specifier, deps) {
+  const targetAbsolute = resolve(dirname(sourceAbsolute), specifier);
+  const relFromRoot = relative(root, targetAbsolute).split(sep).join("/");
+  for (const depId of deps) {
+    const dep = config.extensions[depId];
+    const depPrefix = `${depId}/`;
+    if (!relFromRoot.startsWith(depPrefix)) continue;
+    const relInsideDep = `./${relFromRoot.slice(depPrefix.length)}`;
+    if (dep.exports) {
+      for (const [subpath, expTarget] of Object.entries(dep.exports)) {
+        if (expTarget === relInsideDep) {
+          return subpath === "." ? dep.name : `${dep.name}/${subpath.replace(/^\.\//, "")}`;
+        }
+      }
+    }
+    if (relFromRoot === dep.entry) return dep.name;
+    throw new Error(`Cross-extension import ${specifier} is not exported by ${dep.name}. Add it to ${depId}.exports in kit.config.json.`);
   }
-  cpSync(join(root, "THIRD_PARTY.md"), join(output, "THIRD_PARTY.md"));
-  const description = kind === "forks"
-    ? `Third-party fork of ${item.upstream}. Original resources and existing license files are preserved under \`${item.path}/\`. See [the imported README](${item.path}/README.md) and [THIRD_PARTY.md](THIRD_PARTY.md) for provenance and license scope.`
-    : `The \`${id}\` extension from pi-kit, generated from the same source as the aggregate package. Its shared implementation files are included; only its declared entry is registered as an extension.`;
-  writeFileSync(join(output, "README.md"), `# ${item.name}\n\n${description}\n\nInstall after publication:\n\n\`\`\`sh\npi install npm:${item.name}\n\`\`\`\n\nDo not load the same extension through both this package and the aggregate pi-kit package. Host libraries are supplied by Pi. OS tools and provider authentication retain the requirements of the original extension. This release was generated locally; no publication is performed by the preparation script.\n`);
-  writeFileSync(join(output, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  validateRelativeImports(output);
-  console.log(`Prepared ${item.name}@${item.version}: ${output}`);
-  console.log(`Inspect with: npm pack "${output}" --dry-run --ignore-scripts`);
+  return null;
 }
 
-function validateRelativeImports(directory) {
+function rewriteAndValidateStagedImports(directory, item) {
   const walk = (path) => {
     for (const entry of readdirSync(path, { withFileTypes: true })) {
       const absolute = join(path, entry.name);
-      if (entry.isDirectory()) walk(absolute);
-      else if (/\.[cm]?[jt]s$/.test(entry.name)) {
-        const source = readFileSync(absolute, "utf8");
-        const imports = source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\(\s*)["'](\.[^"']+)["']/g);
-        for (const [, specifier] of imports) {
-          const target = resolve(dirname(absolute), specifier);
-          const rel = relative(directory, target);
-          if (rel === ".." || rel.startsWith(`..${sep}`) || !existsSync(target)) {
-            throw new Error(`Missing local import in release: ${relative(directory, absolute)} -> ${specifier}`);
+      if (entry.isDirectory()) {
+        walk(absolute);
+        continue;
+      }
+      if (!/\.[cm]?[jt]s$/.test(entry.name)) continue;
+
+      const relToStage = relative(directory, absolute);
+      const sourceInRepo = join(root, item.id, relToStage);
+      let source = readFileSync(absolute, "utf8");
+      let modified = false;
+
+      source = source.replace(
+        /((?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\(\s*))(["'])(\.[^"']+)\2/g,
+        (full, prefix, quote, specifier) => {
+          const targetInStage = resolve(dirname(absolute), specifier);
+          const relInStage = relative(directory, targetInStage);
+          if (relInStage !== ".." && !relInStage.startsWith(`..${sep}`) && existsSync(targetInStage)) {
+            return full;
           }
-        }
+          const rewritten = resolveCrossExtensionSpecifier(sourceInRepo, specifier, item.deps);
+          if (rewritten) {
+            modified = true;
+            return `${prefix}${quote}${rewritten}${quote}`;
+          }
+          throw new Error(`Missing local import in release: ${relToStage} -> ${specifier}`);
+        },
+      );
+
+      if (modified) {
+        writeFileSync(absolute, source, "utf8");
       }
     }
   };
   walk(directory);
+}
+
+function stage(id, item, manifest) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`Invalid release id: ${id}`);
+  const output = join(root, "dist", id);
+  rmSync(output, { recursive: true, force: true });
+  mkdirSync(output, { recursive: true });
+  cpSync(sourcePath(id), output, { recursive: true, filter: shouldCopy });
+  writeFileSync(join(output, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  rewriteAndValidateStagedImports(output, item);
+  console.log(`Prepared ${item.name}@${item.version}: ${output}`);
+  console.log(`Inspect with: npm pack "${output}" --dry-run --ignore-scripts`);
+  return output;
+}
+
+function stageExtension(id) {
+  const item = config.extensions[id];
+  if (!item) throw new Error(`Unknown extension: ${id ?? "(missing id)"}. Choices: ${Object.keys(config.extensions).join(", ")}`);
+  const dependencies = Object.fromEntries(
+    item.deps.map((depId) => {
+      const dep = config.extensions[depId];
+      return [dep.name, `^${dep.version}`];
+    }),
+  );
+  const stagedPrompts = item.prompts.map((path) => `./${relative(id, path).split(sep).join("/")}`);
+  return stage(id, item, {
+    name: item.name,
+    version: item.version,
+    type: "module",
+    description: `${id} extension from pi-kit`,
+    keywords: ["pi-package"],
+    repository: { ...current.repository, directory: id },
+    homepage: current.homepage,
+    bugs: current.bugs,
+    engines: current.engines,
+    publishConfig: current.publishConfig,
+    ...(item.exports ? { exports: item.exports } : {}),
+    ...(Object.keys(dependencies).length ? { dependencies } : {}),
+    peerDependencies: hostPeers,
+    pi: {
+      extensions: ["./index.ts"],
+      skills: [],
+      prompts: stagedPrompts,
+      themes: [],
+    },
+  });
+}
+
+function isVersionPublished(pkgName, version) {
+  try {
+    const out = execFileSync("npm", ["view", `${pkgName}@${version}`, "version"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    return out === version;
+  } catch (err) {
+    const stderr = String(err?.stderr ?? err?.message ?? "");
+    if (stderr.includes("E404") || stderr.includes("404")) return false;
+    throw new Error(`Failed to query npm registry for ${pkgName}@${version}: ${stderr.trim()}`);
+  }
+}
+
+function runNpmPublish(dir, pkgName, version) {
+  const args = ["publish", dir, "--access", "public"];
+  if (process.env.GITHUB_ACTIONS === "true") args.push("--provenance");
+  console.log(`Publishing ${pkgName}@${version} from ${dir}...`);
+  execFileSync("npm", args, { cwd: root, stdio: "inherit" });
+}
+
+function expandWithDeps(extIds) {
+  const ordered = [];
+  const visited = new Set();
+  const visit = (extId) => {
+    if (visited.has(extId)) return;
+    visited.add(extId);
+    const item = config.extensions[extId];
+    for (const depId of item.deps) visit(depId);
+    ordered.push(extId);
+  };
+  for (const id of extIds) visit(id);
+  return ordered;
+}
+
+async function publishTarget(target = "auto") {
+  if (JSON.stringify(current) !== JSON.stringify(kitManifest())) {
+    throw new Error("package.json differs from kit.config.json; run npm run manifest first");
+  }
+
+  const tasks = [];
+  if (target === "extensions" || target === "all" || target === "auto") {
+    for (const extId of expandWithDeps(Object.keys(config.extensions))) {
+      const item = config.extensions[extId];
+      tasks.push({ kind: "extension", id: extId, name: item.name, version: item.version });
+    }
+  }
+  if (target === "kit" || target === "all" || target === "auto") {
+    tasks.push({ kind: "kit", id: "kit", name: config.name, version: config.version });
+  }
+  if (!["extensions", "kit", "all", "auto"].includes(target)) {
+    if (!config.extensions[target]) {
+      throw new Error(`Unknown publish target: ${target}. Use extensions, kit, all, or one of: ${Object.keys(config.extensions).join(", ")}`);
+    }
+    for (const extId of expandWithDeps([target])) {
+      const item = config.extensions[extId];
+      tasks.push({ kind: "extension", id: extId, name: item.name, version: item.version });
+    }
+  }
+
+  for (const task of tasks) {
+    if (isVersionPublished(task.name, task.version)) {
+      console.log(`Skipped ${task.name}@${task.version} (already published on npm).`);
+      continue;
+    }
+    const dir = task.kind === "kit" ? root : stageExtension(task.id);
+    runNpmPublish(dir, task.name, task.version);
+  }
 }
 
 validateConfig();
@@ -161,33 +298,12 @@ if (command === "sync") {
   if (JSON.stringify(current) !== JSON.stringify(kitManifest())) {
     throw new Error("package.json differs from kit.config.json; run npm run manifest");
   }
-  for (const item of Object.values(config.forks)) forkResources(item);
-  console.log(`Checked ${Object.keys(config.extensions).length} extensions and ${Object.keys(config.forks).length} fork(s).`);
-  console.log(`Kit exposes ${current.pi.extensions.length} extension entries; top-level skills stay in dotfiles.`);
+  console.log(`Checked ${Object.keys(config.extensions).length} extensions.`);
+  console.log(`Kit exposes ${current.pi.extensions.length} extension entries and ${current.pi.prompts.length} prompt roots.`);
 } else if (command === "extension") {
-  const item = config.extensions[id];
-  if (!item) throw new Error(`Unknown extension: ${id ?? "(missing id)"}. Choices: ${Object.keys(config.extensions).join(", ")}`);
-  stage("extensions", id, item, {
-    name: item.name, version: item.version, type: "module",
-    description: `${id} extension from pi-kit`, keywords: ["pi-package"],
-    repository: { ...current.repository, directory: dirname(item.entry).split(sep).join("/") },
-    homepage: current.homepage, bugs: current.bugs,
-    engines: current.engines, publishConfig: current.publishConfig,
-    files: [...item.files, "THIRD_PARTY.md"], peerDependencies: hostPeers,
-    pi: { extensions: [`./${item.entry}`], skills: [], prompts: [], themes: [] },
-  }, item.files);
-} else if (command === "fork") {
-  const item = config.forks[id];
-  if (!item) throw new Error(`Unknown fork: ${id ?? "(missing id)"}`);
-  const { manifest, pi } = forkResources(item);
-  stage("forks", id, item, {
-    name: item.name, version: item.version, type: "module", description: manifest.description,
-    repository: { ...current.repository, directory: item.path },
-    homepage: current.homepage, bugs: current.bugs,
-    keywords: ["pi-package"], engines: current.engines, publishConfig: current.publishConfig,
-    files: [item.path, "THIRD_PARTY.md"], peerDependencies: { ...manifest.peerDependencies, ...hostPeers },
-    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}), pi,
-  }, [item.path]);
+  stageExtension(id);
+} else if (command === "publish") {
+  await publishTarget(id || "auto");
 } else {
-  throw new Error(`Unknown command: ${command}. Use check, sync, extension <id>, or fork <id>.`);
+  throw new Error(`Unknown command: ${command}. Use check, sync, extension <id>, or publish [extensions|kit|all|<id>].`);
 }

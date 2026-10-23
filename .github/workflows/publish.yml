@@ -1,0 +1,64 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "kit.config.json"
+      - "package.json"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Package target to publish (extensions = all 15 extensions, kit = @rol1n/pi-kit, all = both, or one extension ID)"
+        required: false
+        default: "extensions"
+        type: choice
+        options:
+          - extensions
+          - kit
+          - all
+          - ask-u-questions
+          - continue-signal
+          - custom-providers
+          - image-generate
+          - memory-log
+          - model-vision
+          - multi-harness
+          - oai-subquota
+          - prompt-snipaste
+          - screenshot
+          - srp-theme
+          - subagent
+          - tui-asr
+          - web-reach
+          - windows-wheel-fix
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure latest npm CLI for OIDC Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Validate manifest and extension layout
+        run: npm run check
+
+      - name: Publish selected target
+        run: npm run publish:ci -- "${{ github.event.inputs.target || 'all' }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

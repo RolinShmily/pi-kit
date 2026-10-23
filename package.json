@@ -1,10 +1,10 @@
 {
-  "name": "pi-kit",
-  "version": "0.1.0",
+  "name": "@rol1n/pi-kit",
+  "version": "0.1.1",
   "description": "A selectable collection of Pi extensions and prompt templates.",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/RolinShmily/pi-kit.git"
+    "url": "git+https://github.com/RolinShmily/pi-kit.git"
   },
   "homepage": "https://github.com/RolinShmily/pi-kit#readme",
   "bugs": {
@@ -21,26 +21,41 @@
     "manifest": "node scripts/package.mjs sync",
     "check": "node scripts/package.mjs check",
     "prepare:extension": "node scripts/package.mjs extension",
-    "prepare:fork": "node scripts/package.mjs fork",
+    "publish:ci": "node scripts/package.mjs publish",
     "prepack": "node scripts/package.mjs check"
   },
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "THIRD_PARTY.md",
-    "prompts",
-    "extensions/ask-u-questions.ts",
-    "extensions/continue-signal.ts",
-    "extensions/custom-providers",
-    "extensions/image-generate.ts",
-    "extensions/memory-log",
-    "extensions/multi-harness",
-    "extensions/subagent/mux.ts",
-    "extensions/prompt-snipaste.ts",
-    "extensions/srp-theme.ts",
-    "extensions/subagent",
-    "extensions/tui-asr.ts",
+    "ask-u-questions/README.md",
+    "continue-signal/README.md",
+    "custom-providers/README.md",
+    "image-generate/README.md",
+    "memory-log/README.md",
+    "model-vision/README.md",
+    "multi-harness/README.md",
+    "oai-subquota/README.md",
+    "prompt-snipaste/README.md",
+    "screenshot/README.md",
+    "srp-theme/README.md",
+    "subagent/README.md",
+    "tui-asr/README.md",
+    "web-reach/README.md",
+    "windows-wheel-fix/README.md",
+    "ask-u-questions",
+    "continue-signal",
+    "custom-providers",
+    "image-generate",
+    "memory-log",
+    "multi-harness",
+    "subagent",
+    "oai-subquota",
+    "prompt-snipaste",
+    "srp-theme",
+    "tui-asr",
+    "web-reach",
+    "windows-wheel-fix",
     "!**/test/**",
     "!**/tests/**",
     "!**/*.{test,spec}.{ts,js,mjs,cjs}",
@@ -56,20 +71,23 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/ask-u-questions.ts",
-      "./extensions/continue-signal.ts",
-      "./extensions/custom-providers/index.ts",
-      "./extensions/image-generate.ts",
-      "./extensions/memory-log/index.ts",
-      "./extensions/multi-harness/index.ts",
-      "./extensions/prompt-snipaste.ts",
-      "./extensions/srp-theme.ts",
-      "./extensions/subagent/index.ts",
-      "./extensions/tui-asr.ts"
+      "./ask-u-questions/index.ts",
+      "./continue-signal/index.ts",
+      "./custom-providers/index.ts",
+      "./image-generate/index.ts",
+      "./memory-log/index.ts",
+      "./multi-harness/index.ts",
+      "./oai-subquota/index.ts",
+      "./prompt-snipaste/index.ts",
+      "./srp-theme/index.ts",
+      "./subagent/index.ts",
+      "./tui-asr/index.ts",
+      "./web-reach/index.ts",
+      "./windows-wheel-fix/index.ts"
     ],
     "skills": [],
     "prompts": [
-      "./prompts"
+      "./prompt-snipaste/prompts"
     ],
     "themes": []
   }

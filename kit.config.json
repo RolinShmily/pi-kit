@@ -1,0 +1,158 @@
+{
+  "name": "pi-kit",
+  "version": "0.1.0",
+  "description": "A selectable collection of Pi extensions and prompt templates.",
+  "prompts": [
+    "prompts"
+  ],
+  "extensions": {
+    "ask-u-questions": {
+      "name": "pi-kit-ask-u-questions",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/ask-u-questions.ts",
+      "files": [
+        "extensions/ask-u-questions.ts"
+      ]
+    },
+    "continue-signal": {
+      "name": "pi-kit-continue-signal",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/continue-signal.ts",
+      "files": [
+        "extensions/continue-signal.ts"
+      ]
+    },
+    "custom-providers": {
+      "name": "pi-kit-custom-providers",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/custom-providers/index.ts",
+      "files": [
+        "extensions/custom-providers"
+      ]
+    },
+    "image-generate": {
+      "name": "pi-kit-image-generate",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/image-generate.ts",
+      "files": [
+        "extensions/image-generate.ts",
+        "extensions/custom-providers"
+      ]
+    },
+    "memory-log": {
+      "name": "pi-kit-memory-log",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/memory-log/index.ts",
+      "files": [
+        "extensions/memory-log"
+      ]
+    },
+    "model-vision": {
+      "name": "pi-kit-model-vision",
+      "version": "0.1.0",
+      "bundle": false,
+      "entry": "extensions/model-vision.ts",
+      "files": [
+        "extensions/model-vision.ts"
+      ]
+    },
+    "multi-harness": {
+      "name": "pi-kit-multi-harness",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/multi-harness/index.ts",
+      "files": [
+        "extensions/multi-harness",
+        "extensions/subagent/mux.ts"
+      ]
+    },
+    "oai-subquota": {
+      "name": "pi-kit-oai-subquota",
+      "version": "0.1.0",
+      "bundle": false,
+      "entry": "extensions/oai-subquota.ts",
+      "files": [
+        "extensions/oai-subquota.ts"
+      ]
+    },
+    "prompt-snipaste": {
+      "name": "pi-kit-prompt-snipaste",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/prompt-snipaste.ts",
+      "files": [
+        "extensions/prompt-snipaste.ts"
+      ]
+    },
+    "screenshot": {
+      "name": "pi-kit-screenshot",
+      "version": "0.1.0",
+      "bundle": false,
+      "entry": "extensions/screenshot.ts",
+      "files": [
+        "extensions/screenshot.ts"
+      ]
+    },
+    "srp-theme": {
+      "name": "pi-kit-srp-theme",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/srp-theme.ts",
+      "files": [
+        "extensions/srp-theme.ts"
+      ]
+    },
+    "subagent": {
+      "name": "pi-kit-subagent",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/subagent/index.ts",
+      "files": [
+        "extensions/subagent"
+      ]
+    },
+    "tui-asr": {
+      "name": "pi-kit-tui-asr",
+      "version": "0.1.0",
+      "bundle": true,
+      "entry": "extensions/tui-asr.ts",
+      "files": [
+        "extensions/tui-asr.ts",
+        "extensions/custom-providers"
+      ]
+    },
+    "web-reach": {
+      "name": "pi-kit-web-reach",
+      "version": "0.1.0",
+      "bundle": false,
+      "entry": "extensions/web-reach.ts",
+      "files": [
+        "extensions/web-reach.ts"
+      ]
+    },
+    "windows-wheel-fix": {
+      "name": "pi-kit-windows-wheel-fix",
+      "version": "0.1.0",
+      "bundle": false,
+      "entry": "extensions/windows-wheel-fix.ts",
+      "files": [
+        "extensions/windows-wheel-fix.ts"
+      ]
+    }
+  },
+  "forks": {
+    "pi-learn": {
+      "name": "pi-kit-learn",
+      "version": "1.0.0",
+      "bundle": false,
+      "path": "packages/pi-learn",
+      "upstream": "https://github.com/amosblomqvist/learn",
+      "note": "Third-party fork imported from srp-dotfiles; see packages/README.md and THIRD_PARTY.md."
+    }
+  }
+}

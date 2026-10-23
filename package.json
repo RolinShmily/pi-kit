@@ -1,7 +1,7 @@
 {
   "name": "@rol1n/pi-kit",
-  "version": "0.1.2",
-  "description": "A selectable collection of Pi extensions and prompt templates.",
+  "version": "0.1.3",
+  "description": "A selectable collection of Pi extensions, prompt templates, and skills.",
   "author": "RoL1n_SrP",
   "license": "MIT",
   "repository": {
@@ -20,43 +20,32 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "manifest": "node scripts/package.mjs sync",
-    "check": "node scripts/package.mjs check",
-    "prepare:extension": "node scripts/package.mjs extension",
-    "publish:ci": "node scripts/package.mjs publish",
-    "prepack": "node scripts/package.mjs check"
+    "check": "node scripts/check-package.mjs",
+    "test": "node --experimental-strip-types --test memory-log/hooks/*.test.ts memory-log/ledger/*.test.ts prompt-snipaste/*.test.ts",
+    "prepack": "npm run check"
   },
   "publishConfig": {
     "access": "public"
   },
   "files": [
     "README_zh.md",
-    "ask-u-questions/README.md",
-    "continue-signal/README.md",
-    "custom-providers/README.md",
-    "image-generate/README.md",
-    "memory-log/README.md",
-    "model-vision/README.md",
-    "multi-harness/README.md",
-    "oai-subquota/README.md",
-    "prompt-snipaste/README.md",
-    "screenshot/README.md",
-    "srp-theme/README.md",
-    "subagent/README.md",
-    "tui-asr/README.md",
-    "web-reach/README.md",
-    "windows-wheel-fix/README.md",
+    "scripts/check-package.mjs",
+    "prompts",
+    "skills",
     "ask-u-questions",
     "continue-signal",
     "custom-providers",
     "image-generate",
     "memory-log",
+    "model-vision",
     "multi-harness",
     "subagent",
     "oai-subquota",
     "prompt-snipaste",
+    "screenshot",
     "srp-theme",
     "tui-asr",
+    "web-reach",
     "windows-wheel-fix",
     "!**/test/**",
     "!**/tests/**",
@@ -78,17 +67,22 @@
       "./custom-providers/index.ts",
       "./image-generate/index.ts",
       "./memory-log/index.ts",
+      "./model-vision/index.ts",
       "./multi-harness/index.ts",
       "./oai-subquota/index.ts",
       "./prompt-snipaste/index.ts",
+      "./screenshot/index.ts",
       "./srp-theme/index.ts",
       "./subagent/index.ts",
       "./tui-asr/index.ts",
+      "./web-reach/index.ts",
       "./windows-wheel-fix/index.ts"
     ],
-    "skills": [],
+    "skills": [
+      "./skills"
+    ],
     "prompts": [
-      "./prompt-snipaste/prompts"
+      "./prompts"
     ],
     "themes": []
   }

@@ -5,10 +5,12 @@ Streaming voice dictation for Pi's terminal editor using Aliyun DashScope Parafo
 ## Install
 
 ```sh
-pi install npm:@rol1n/tui-asr
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`. Installing this package automatically installs `@rol1n/custom-providers`.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions.
+
+Uses `custom-providers` from the same kit; required provider registration is initialized automatically.
 
 ## Commands and shortcuts
 

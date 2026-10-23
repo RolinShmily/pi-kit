@@ -1,4 +1,5 @@
 export interface Snippet {
+	/** Absolute source path when loaded from Pi; stable across menu refreshes. */
 	id: string;
 	name: string;
 	description: string;

@@ -8,7 +8,7 @@ Searches standard and localized `Pictures/Screenshots` and OneDrive screenshot d
 ## Install
 
 ```sh
-pi install npm:@rol1n/screenshot
+pi install npm:@rol1n/pi-kit
 ```
 
-Available as a standalone package (not enabled in `@rol1n/pi-kit` by default).
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions.

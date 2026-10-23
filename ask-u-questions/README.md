@@ -5,10 +5,10 @@ Interactive single-choice, multiple-choice, and free-text questions for Pi. Regi
 ## Install
 
 ```sh
-pi install npm:@rol1n/ask-u-questions
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions.
 
 ## Use
 

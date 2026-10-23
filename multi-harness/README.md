@@ -2,19 +2,19 @@
 
 A small delegation runtime with one tool, `multi_harness`. `pi`, `codex`, `claude`, and `opencode` are equal CLI peers. The original `subagent` extension remains a separate, lean Pi-only tool.
 
-The runtime accepts **one named worker and an existing cwd**. Those decisions belong to the caller. An independently installed `worktree-studio` skill can coordinate isolated implementations and their acceptance review.
+The runtime accepts **one named worker and an existing cwd**. Those decisions belong to the caller. The bundled [worktree-studio skill](../skills/worktree-studio/SKILL.md) can coordinate isolated implementations and their acceptance review; enable it through the kit's `skills` resource selection.
 
 ## Install
 
 ```sh
-pi install npm:@rol1n/multi-harness
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`. Enable one copy of the extension.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions. Enable one copy of the extension.
 
 ## Use
 
-Load `multi-harness` through the aggregate package, or run from this repository:
+Load `multi-harness` through `pi-kit`, or run from this repository:
 
 ```sh
 pi --no-extensions -e ./multi-harness/index.ts

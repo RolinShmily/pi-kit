@@ -5,10 +5,10 @@ Incremental Pi terminal presentation enhancement: adds a `belowEditor` last-prom
 ## Install
 
 ```sh
-pi install npm:@rol1n/srp-theme
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions.
 
 ## Commands
 

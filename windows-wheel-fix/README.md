@@ -6,7 +6,7 @@ Restores mouse-wheel reporting for Pi under Windows ConPTY / Zellij ([earendil-w
 ## Install
 
 ```sh
-pi install npm:@rol1n/windows-wheel-fix
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions.

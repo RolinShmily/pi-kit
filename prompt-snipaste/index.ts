@@ -20,11 +20,11 @@ export default function promptSnipaste(pi: ExtensionAPI) {
 			return;
 		}
 
-		snippets = loadSnippets(ctx.cwd, pi);
+		snippets = loadSnippets(pi);
 		enabled = new Set([...enabled].filter((id) => snippets.some((s) => s.id === id)));
 
 		if (snippets.length === 0) {
-			ctx.ui.notify("No Markdown files found in prompt directories", "warning");
+			ctx.ui.notify("No enabled prompt templates. Add prompts in Pi settings, then /reload.", "warning");
 			updateWidget(ctx);
 			return;
 		}
@@ -50,14 +50,14 @@ export default function promptSnipaste(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		enabled = new Set();
 		pendingTurnSnippets = null;
-		snippets = loadSnippets(ctx.cwd, pi);
+		snippets = loadSnippets(pi);
 		updateWidget(ctx);
 	});
 
 	pi.on("input", async (_event, ctx) => {
 		if (enabled.size === 0) return undefined;
 
-		snippets = loadSnippets(ctx.cwd, pi);
+		snippets = loadSnippets(pi);
 		const active = snippets.filter((s) => enabled.has(s.id));
 		enabled = new Set();
 		updateWidget(ctx);

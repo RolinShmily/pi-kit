@@ -7,10 +7,10 @@
 ## Install
 
 ```sh
-pi install npm:@rol1n/memory-log
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`. The extension loads with new-session memory disabled by default (`/mem-log on` to enable for the current session, or `"defaultEnabled": true` in settings).
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions. The extension loads with new-session memory disabled by default (`/mem-log on` to enable for the current session, or `"defaultEnabled": true` in settings).
 
 ---
 

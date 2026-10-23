@@ -5,10 +5,10 @@ Delegate tasks to independent, full-powered Pi workers. The `subagent` tool retu
 ## Install
 
 ```sh
-pi install npm:@rol1n/subagent
+pi install npm:@rol1n/pi-kit
 ```
 
-Also included in `@rol1n/pi-kit`. The parent and workers require the `pi` executable on PATH and their normal Pi authentication.
+Included and loaded by default in `@rol1n/pi-kit`. See [resource selection](../README.md#resource-selection) to disable this entry or load only selected extensions. The parent and workers require the `pi` executable on PATH and their normal Pi authentication.
 
 ## Use
 
@@ -30,6 +30,6 @@ Also included in `@rol1n/pi-kit`. The parent and workers require the `pi` execut
 
 Without a usable multiplexer, the worker backend falls back to a background process. Native Windows supports PowerShell launch commands and Zellij panes; tmux is for POSIX environments. Session transcripts and task artifacts are stored under `~/.pi/agent/`.
 
-## Other delegation packages
+## Other delegation tools
 
-Use [multi-harness](https://github.com/RolinShmily/pi-kit/tree/main/multi-harness) for Codex, Claude, or OpenCode peers. That package shares multiplexer helpers (`mux.ts`) while exposing a separate tool.
+Use [multi-harness](https://github.com/RolinShmily/pi-kit/tree/main/multi-harness) for Codex, Claude, or OpenCode peers. It shares multiplexer helpers (`mux.ts`) within the same kit while exposing a separate tool.

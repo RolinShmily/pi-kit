@@ -5,9 +5,8 @@ on:
     branches:
       - main
     paths:
-      - "kit.config.json"
       - "package.json"
-      - "scripts/package.mjs"
+      - "scripts/check-package.mjs"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
 
@@ -37,13 +36,31 @@ jobs:
       - name: Ensure latest npm CLI for OIDC Trusted Publishing
         run: npm install -g --ignore-scripts npm@latest
 
-      - name: Generate manifest from kit.config.json
-        run: npm run manifest
-
-      - name: Validate manifest and extension layout
+      - name: Validate package and extension layout
         run: npm run check
 
-      - name: Publish all extensions and the kit
-        run: npm run publish:ci -- all
+      - name: Run tests
+        run: npm test
+
+      - name: Publish pi-kit if this version is new
+        shell: bash
+        run: |
+          package_name="$(node -p 'require("./package.json").name')"
+          version="$(node -p 'require("./package.json").version')"
+          error_file="$RUNNER_TEMP/npm-view-error"
+
+          if published_version="$(npm view "$package_name@$version" version --prefer-online 2>"$error_file")"; then
+            if [[ "$published_version" != "$version" ]]; then
+              echo "Unexpected npm registry response for $package_name@$version" >&2
+              exit 1
+            fi
+            echo "Skipped $package_name@$version (already published on npm)."
+            exit 0
+          elif ! grep -q 'E404' "$error_file"; then
+            cat "$error_file" >&2
+            exit 1
+          fi
+
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -34,12 +34,12 @@ Update with `pi update npm:@rol1n/pi-kit` or `pi update --extensions`.
 | [srp-theme](srp-theme/README.md) | Prompt preview footer and streaming TPS meter | Yes | `@rol1n/srp-theme` |
 | [subagent](subagent/README.md) | Delegate to asynchronous Pi workers | Yes | `@rol1n/subagent` |
 | [tui-asr](tui-asr/README.md) | Streaming voice dictation via DashScope ASR | Yes | `@rol1n/tui-asr` |
-| [web-reach](web-reach/README.md) | Keyless Exa web search and multi-tier page extraction | Yes | `@rol1n/web-reach` |
+| [web-reach](web-reach/README.md) | Keyless Exa web search and multi-tier page extraction | No | `@rol1n/web-reach` |
 | [windows-wheel-fix](windows-wheel-fix/README.md) | Windows ConPTY/Zellij mouse-wheel reporting fix | Yes (Windows only) | `@rol1n/windows-wheel-fix` |
 
 ## Resource selection
 
-The kit exposes 13 extension entrypoints and the 7 prompt templates bundled in [prompt-snipaste/prompts](prompt-snipaste/prompts/). Narrow loaded resources with `pi config` or in `settings.json`:
+The kit exposes 12 extension entrypoints and the 7 prompt templates bundled in [prompt-snipaste/prompts](prompt-snipaste/prompts/). Narrow loaded resources with `pi config` or in `settings.json`:
 
 ```json
 {

@@ -8,7 +8,7 @@ Keyless web search (`web_search` via Exa MCP) and multi-tier page extraction (`w
 pi install npm:@rol1n/web-reach
 ```
 
-Also included in `@rol1n/pi-kit`.
+Available as a standalone package (not enabled in `@rol1n/pi-kit` by default).
 
 ## Configuration
 

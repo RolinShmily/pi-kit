@@ -30,7 +30,7 @@
       }
     },
     "tui-asr": { "bundle": true, "deps": ["custom-providers"] },
-    "web-reach": { "bundle": true },
+    "web-reach": { "bundle": false },
     "windows-wheel-fix": { "bundle": true }
   }
 }

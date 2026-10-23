@@ -54,7 +54,6 @@
     "prompt-snipaste",
     "srp-theme",
     "tui-asr",
-    "web-reach",
     "windows-wheel-fix",
     "!**/test/**",
     "!**/tests/**",
@@ -82,7 +81,6 @@
       "./srp-theme/index.ts",
       "./subagent/index.ts",
       "./tui-asr/index.ts",
-      "./web-reach/index.ts",
       "./windows-wheel-fix/index.ts"
     ],
     "skills": [],

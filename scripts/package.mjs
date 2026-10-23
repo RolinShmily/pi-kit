@@ -88,7 +88,7 @@ function validateConfig() {
 
 function kitManifest() {
   const pi = { extensions: [], skills: [], prompts: [], themes: [] };
-  const files = [...Object.values(config.extensions).map((item) => item.readme)];
+  const files = ["README_zh.md", ...Object.values(config.extensions).map((item) => item.readme)];
   for (const item of Object.values(config.extensions).filter((item) => item.bundle)) {
     pi.extensions.push(`./${item.entry}`);
     pi.prompts.push(...item.prompts.map((path) => `./${path}`));
@@ -178,6 +178,9 @@ function stage(id, item, manifest) {
   rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
   cpSync(sourcePath(id), output, { recursive: true, filter: shouldCopy });
+  if (existsSync(join(root, "LICENSE"))) {
+    cpSync(join(root, "LICENSE"), join(output, "LICENSE"));
+  }
   writeFileSync(join(output, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   rewriteAndValidateStagedImports(output, item);
   console.log(`Prepared ${item.name}@${item.version}: ${output}`);
@@ -200,6 +203,8 @@ function stageExtension(id) {
     version: item.version,
     type: "module",
     description: `${id} extension from pi-kit`,
+    author: current.author,
+    license: current.license,
     keywords: ["pi-package"],
     repository: { ...current.repository, directory: id },
     homepage: current.homepage,

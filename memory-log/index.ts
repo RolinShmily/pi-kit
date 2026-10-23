@@ -20,6 +20,7 @@ import { registerObserverTrigger } from "./hooks/observer-trigger.ts";
 import { OM_ENABLED, type Entry } from "./ledger/index.ts";
 import { ensureSessionMemory } from "./memory/session.ts";
 import { Runtime } from "./runtime.ts";
+import { registerRecallTool } from "./tools/recall.ts";
 
 function readGateFromLedger(branch: Entry[], defaultEnabled: boolean): boolean {
   for (let i = branch.length - 1; i >= 0; i--) {
@@ -135,6 +136,9 @@ export default function observationalMemory(pi: ExtensionAPI): void {
     getArgumentCompletions: getCompletions,
     handler: commandHandler,
   });
+
+  // Read-only recall remains available when background memory processing is off.
+  registerRecallTool(pi);
 
   // Triggers + hooks
   registerObserverTrigger(pi, runtime);

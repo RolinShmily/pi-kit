@@ -2,7 +2,7 @@
 
 > Tiered asynchronous observational memory for long-running Pi sessions.
 
-`memory-log` keeps multi-day coding sessions coherent across compactions without blocking your workflow. Based on the observational memory paradigm from [elpapi42/pi-observational-memory](https://github.com/elpapi42/pi-observational-memory), it moves memory distillation into background subprocesses while you work, turning context compaction into an instant, model-free rendering step.
+`memory-log` keeps multi-day coding sessions coherent across compactions without blocking your workflow. Based on the observational memory paradigm from [elpapi42/pi-observational-memory](https://github.com/elpapi42/pi-observational-memory), it moves memory distillation into background subprocesses while you work, making compaction a model-free rendering step when sufficient observations are available. If a safe cutoff or usable memory summary is unavailable, Pi's native summarizer takes over instead.
 
 ## Install
 
@@ -25,7 +25,8 @@ Long AI coding sessions typically hit two walls:
 
 - **Background Observers**: Whenever raw conversation history accumulates a full chunk (`chunkTokens`), a background Pi worker distills that chunk into timestamped, priority-tagged (`🔴` / `🟡` / `🟢`) atomic observations stored in the session branch ledger.
 - **Consolidator & Durable Topic Files**: When the active observation pool reaches `consolidateAtPoolTokens`, a background consolidator archives older observations into durable Markdown topic files under `.memory/<sessionId>/` (`INDEX.md`, `<topic>.md`) and appends project milestones to `.memory/<sessionId>/JOURNEY.md`, draining the active pool back toward `poolTargetTokens`.
-- **Model-Free Deterministic Compaction**: When live context usage reaches `compactAtContextTokens`, compaction snaps the cutoff to the nearest completed observation chunk boundary (preserving `tailTokens` of verbatim recent dialogue) and deterministically reconstructs the context block from `JOURNEY.md` + the **Memory Map** (topic summaries) + the short-term active observation pool. Zero LLM calls are made during compaction itself.
+- **Safe Deterministic Compaction**: After `agent_settled` (all retries and queued continuations have finished), context pressure can trigger compaction. The cutoff snaps to a completed observation boundary near `tailTokens`, never crossing an unobserved gap in newly recorded chunks or splitting a tool call from its results. The entire unobserved tail stays verbatim, even if larger than the target. The summary is rendered from `JOURNEY.md` + the **Memory Map** + active observations, without an LLM call. Missing boundaries or empty memory delegate to Pi's native summarizer, which may make an LLM call.
+- **Source Recall**: `memory_recall` retrieves the original conversation chunk behind an observation by timestamp, including history hidden by compaction and observations archived to topic files.
 - **TUI Observability**: Displays live footer gauges (`Next` chunk progress, `Pool` capacity, `Ctx` window usage), active worker spinners, and session memory cost.
 
 ---
@@ -37,8 +38,26 @@ Long AI coding sessions typically hit two walls:
 | `/mem-log` | Enable memory log (if off) or display status & timeline (if on) |
 | `/mem-log on` / `/mem-log off` | Enable or disable observational memory for the current session |
 | `/mem-log status` or `/mem-log:status` | View gauges, worker states, cost summary, and observation timeline |
-| `/mem-log compact` or `/mem-log:compact` | Trigger immediate deterministic compaction |
+| `/mem-log compact` or `/mem-log:compact` | Request immediate compaction (native summarization if no safe memory cutoff exists) |
 | `/mem-log consolidate` or `/mem-log:consolidate` | Consolidate the active observation pool into durable topic files immediately |
+
+---
+
+## Source recall
+
+The agent can call `memory_recall` with an observation's full timestamp-id (including a `.NN` suffix, if present), or an unambiguous prefix:
+
+```json
+{ "timestamp": "2026-10-23T14:30:00" }
+```
+
+- New observations persist exact `sourceEntryIds`; provenance covers the **whole chunk**, not a per-fact citation.
+- Older records remain readable: ranges are inferred from coverage anchors in source order, not worker completion order. Inferred ranges are explicitly labeled and may include extra conversation; old records cannot prove gaps caused by failed workers. Legacy compaction coverage retains its existing watermark interpretation.
+- Recall searches only the **current branch**. Missing sources are reported as unavailable or partial, never borrowed from another branch. Archived observations remain traceable in the ledger.
+- Output is paged at 12,000 source characters. Use the returned `nextOffset` as `offset` to continue; `limit` can request a smaller page. Images/non-text blocks use placeholders.
+- Recall is read-only and remains available when background memory processing is disabled.
+
+Automatic compaction requires a Pi version that exposes `agent_settled`. Aborted runs do not trigger it; there is no retry-error guessing or idle polling. Pi's own compaction mechanism remains independent.
 
 ---
 
@@ -57,7 +76,6 @@ Add a `memoryLog` section to `~/.pi/agent/settings.json` (global) or `.pi/settin
     "tailTokens": 20000,
     "journeyTargetTokens": 1000,
     "observerConcurrency": 4,
-    "resumeAfterMidRunCompaction": true,
     "passive": false,
     "debugLog": false,
     "models": {
@@ -67,6 +85,8 @@ Add a `memoryLog` section to `~/.pi/agent/settings.json` (global) or `.pi/settin
   }
 }
 ```
+
+`resumeAfterMidRunCompaction` is retained for configuration compatibility but has no effect: this extension's automatic trigger now runs only after settlement and never starts a synthetic continuation.
 
 ### Model resolution
 

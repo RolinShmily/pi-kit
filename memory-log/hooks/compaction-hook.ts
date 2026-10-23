@@ -14,16 +14,50 @@ import {
   type Entry,
 } from "../ledger/index.ts";
 
-/** Distinct, branch-resolved coversUpToId indices of committed observation chunks, ascending. */
+/**
+ * Completed boundaries behind the contiguous observation frontier. A later worker
+ * finishing first must not authorize discarding an earlier failed/in-flight chunk.
+ * Legacy records only have a cumulative watermark; retain that older contract.
+ */
 function chunkBoundaryIndices(branch: Entry[]): number[] {
   const indexes = entryIndexById(branch);
-  const set = new Set<number>();
-  for (const entry of branch) {
+  const boundaries = new Set<number>();
+  const coveredAt = new Map<string, number>();
+  let legacyFrontier = -1;
+  for (let i = 0; i < branch.length; i++) {
+    const entry = branch[i];
     if (!isObservationsRecordedEntry(entry)) continue;
     const idx = indexes.get(entry.data.coversUpToId);
-    if (idx !== undefined) set.add(idx);
+    if (idx === undefined || idx >= i || !isSourceEntry(branch[idx])) continue;
+    if (entry.data.sourceEntryIds === undefined) {
+      legacyFrontier = Math.max(legacyFrontier, idx);
+    } else {
+      const ids = entry.data.sourceEntryIds;
+      // Reject unresolved, out-of-order, or non-source anchors.
+      let previous = -1;
+      const valid = ids.length > 0 && ids.at(-1) === entry.data.coversUpToId && ids.every((id) => {
+        const index = indexes.get(id);
+        if (index === undefined || index <= previous || index > idx || !isSourceEntry(branch[index])) return false;
+        previous = index;
+        return true;
+      });
+      if (!valid) continue;
+      for (const id of ids) coveredAt.set(id, Math.min(coveredAt.get(id) ?? Infinity, idx));
+    }
+    boundaries.add(idx);
   }
-  return Array.from(set).sort((a, b) => a - b);
+  const safeBoundaries: number[] = [];
+  let requiredCoverageEnd = -1;
+  for (let i = 0; i < branch.length; i++) {
+    if (isSourceEntry(branch[i])) {
+      const coveredEnd = i <= legacyFrontier ? i : (coveredAt.get(branch[i].id) ?? Infinity);
+      requiredCoverageEnd = Math.max(requiredCoverageEnd, coveredEnd);
+    }
+    // The projection must include the records that authorize this cut, not just
+    // records for overlapping chunks whose watermarks lie beyond it.
+    if (boundaries.has(i) && requiredCoverageEnd <= i) safeBoundaries.push(i);
+  }
+  return safeBoundaries;
 }
 
 /** First source entry after `boundaryIndex` that is a valid cut point, or undefined. */
@@ -37,9 +71,9 @@ function firstKeptAfterBoundary(branch: Entry[], boundaryIndex: number): Entry |
 
 export function snapCutoff(
   branch: Entry[],
-  proposedFirstKeptId: string,
+  _proposedFirstKeptId: string,
   tailTokens: number,
-): { firstKeptId: string; tail: number | undefined } {
+): { firstKeptId: string | undefined; tail: number | undefined } {
   const indexes = entryIndexById(branch);
   const lastCompactionIdx = findLastCompactionIndex(branch);
   const boundaries = chunkBoundaryIndices(branch);
@@ -80,26 +114,21 @@ export function snapCutoff(
     }
   }
 
-  if (!finalFirstKeptId) {
-    finalFirstKeptId = proposedFirstKeptId;
-    finalTail = undefined;
-  }
-
   return { firstKeptId: finalFirstKeptId, tail: finalTail };
 }
 
-export function snapFirstKeptEntryId(branch: Entry[], proposedFirstKeptId: string, tailTokens: number): string {
+export function snapFirstKeptEntryId(branch: Entry[], proposedFirstKeptId: string, tailTokens: number): string | undefined {
   return snapCutoff(branch, proposedFirstKeptId, tailTokens).firstKeptId;
 }
 
 export function canSkipObserverWait(
   branch: Entry[],
-  snappedFirstKeptId: string,
+  snappedFirstKeptId: string | undefined,
   snappedTail: number | undefined,
   tailTokens: number,
   observersInFlight: Iterable<{ coversUpToId: string }>,
 ): boolean {
-  if (snappedTail === undefined || snappedTail > tailTokens) return false;
+  if (!snappedFirstKeptId || snappedTail === undefined || snappedTail > tailTokens) return false;
 
   const indexes = entryIndexById(branch);
   const cutoffIndex = indexes.get(snappedFirstKeptId);
@@ -115,6 +144,7 @@ export function canSkipObserverWait(
 export function registerCompactionHook(pi: ExtensionAPI, runtime: Runtime): void {
   pi.on("session_before_compact", async (event: any, ctx: any) => {
     if (!runtime.enabled || runtime.config.passive) return undefined;
+    if (event.signal?.aborted) return { cancel: true };
 
     const hasUI = ctx.hasUI;
     if (runtime.compactHookInFlight) {
@@ -140,11 +170,24 @@ export function registerCompactionHook(pi: ExtensionAPI, runtime: Runtime): void
         snap = snapCutoff(branch, firstKeptEntryId, tailTokens);
       }
 
+      if (event.signal?.aborted) return { cancel: true };
+      if (!runtime.enabled) return undefined;
+
+      // No proven observed cut: let Pi summarize the raw history, never stamp an
+      // empty deterministic summary over unobserved messages (including old tails).
       const snapped = snap.firstKeptId;
+      if (!snapped || snap.tail === undefined) {
+        if (hasUI) ctx.ui.notify("memory-log: no safe observed cutoff — using Pi's native summarizer", "info");
+        return undefined;
+      }
       const projection = buildCompactionProjection(branch, snapped);
       const journey = readJourney(runtime.memoryRoot);
       const map = renderMemoryMap(listTopics(runtime.memoryRoot));
       const summary = renderSummary(journey, map, projection.observations);
+      if (!summary.trim()) {
+        if (hasUI) ctx.ui.notify("memory-log: memory summary is empty — using Pi's native summarizer", "info");
+        return undefined;
+      }
 
       return {
         compaction: {

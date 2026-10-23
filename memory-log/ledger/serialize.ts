@@ -76,10 +76,8 @@ export function serializeConversation(messages: Message[]): string {
         return `[User @ ${time}]: ${textOnly(msg.content)}`;
       }
       if (msg.role === "assistant") {
-        const body = textAndPlaceholders(msg.content, { includeThinking: true })
-          .split("\n")
-          .filter(Boolean)
-          .join("\n");
+        // Keep blank lines in source evidence (code/diffs and stack traces).
+        const body = textAndPlaceholders(msg.content, { includeThinking: true });
         if (!body) return null;
         return `[Assistant @ ${time}]: ${body}`;
       }

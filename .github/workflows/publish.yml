@@ -7,32 +7,14 @@ on:
     paths:
       - "kit.config.json"
       - "package.json"
+      - "scripts/package.mjs"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
-    inputs:
-      target:
-        description: "Package target to publish (extensions = all 15 extensions, kit = @rol1n/pi-kit, all = both, or one extension ID)"
-        required: false
-        default: "extensions"
-        type: choice
-        options:
-          - extensions
-          - kit
-          - all
-          - ask-u-questions
-          - continue-signal
-          - custom-providers
-          - image-generate
-          - memory-log
-          - model-vision
-          - multi-harness
-          - oai-subquota
-          - prompt-snipaste
-          - screenshot
-          - srp-theme
-          - subagent
-          - tui-asr
-          - web-reach
-          - windows-wheel-fix
+
+# Avoid racing npm publishes, without interrupting a release already in progress.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -53,12 +35,15 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Ensure latest npm CLI for OIDC Trusted Publishing
-        run: npm install -g npm@latest
+        run: npm install -g --ignore-scripts npm@latest
+
+      - name: Generate manifest from kit.config.json
+        run: npm run manifest
 
       - name: Validate manifest and extension layout
         run: npm run check
 
-      - name: Publish selected target
-        run: npm run publish:ci -- "${{ github.event.inputs.target || 'all' }}"
+      - name: Publish all extensions and the kit
+        run: npm run publish:ci -- all
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

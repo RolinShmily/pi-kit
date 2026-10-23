@@ -42,7 +42,7 @@ export interface Config {
    * used as the last-resort fallback when no session model is available.
    */
   settingsDefaultModel?: { provider?: string; id?: string };
-  /** Resume the agent automatically after a mid-run compaction. */
+  /** @deprecated Compatibility only; automatic compaction now runs after agent_settled. */
   resumeAfterMidRunCompaction: boolean;
   /** Power-user setting: disable all triggers (distinct from the on/off gate). */
   passive: boolean;

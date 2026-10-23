@@ -1,11 +1,12 @@
 {
   "name": "@rol1n/pi-kit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A selectable collection of Pi extensions and prompt templates.",
   "extensions": {
-    "ask-u-questions": { "bundle": true },
-    "continue-signal": { "bundle": true },
+    "ask-u-questions": { "version": "0.1.1", "bundle": true },
+    "continue-signal": { "version": "0.1.1", "bundle": true },
     "custom-providers": {
+      "version": "0.1.1",
       "bundle": true,
       "exports": {
         ".": "./index.ts",
@@ -14,23 +15,24 @@
         "./chat": "./chat/index.ts"
       }
     },
-    "image-generate": { "bundle": true, "deps": ["custom-providers"] },
-    "memory-log": { "bundle": true },
-    "model-vision": { "bundle": false },
-    "multi-harness": { "bundle": true, "deps": ["subagent"] },
-    "oai-subquota": { "bundle": true },
-    "prompt-snipaste": { "bundle": true },
-    "screenshot": { "bundle": false },
-    "srp-theme": { "bundle": true },
+    "image-generate": { "version": "0.1.1", "bundle": true, "deps": ["custom-providers"] },
+    "memory-log": { "version": "0.1.2", "bundle": true },
+    "model-vision": { "version": "0.1.1", "bundle": false },
+    "multi-harness": { "version": "0.1.1", "bundle": true, "deps": ["subagent"] },
+    "oai-subquota": { "version": "0.1.1", "bundle": true },
+    "prompt-snipaste": { "version": "0.1.1", "bundle": true },
+    "screenshot": { "version": "0.1.1", "bundle": false },
+    "srp-theme": { "version": "0.1.1", "bundle": true },
     "subagent": {
+      "version": "0.1.1",
       "bundle": true,
       "exports": {
         ".": "./index.ts",
         "./mux": "./mux.ts"
       }
     },
-    "tui-asr": { "bundle": true, "deps": ["custom-providers"] },
-    "web-reach": { "bundle": false },
-    "windows-wheel-fix": { "bundle": true }
+    "tui-asr": { "version": "0.1.1", "bundle": true, "deps": ["custom-providers"] },
+    "web-reach": { "version": "0.1.1", "bundle": false },
+    "windows-wheel-fix": { "version": "0.1.1", "bundle": true }
   }
 }

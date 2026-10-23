@@ -102,6 +102,7 @@ async function dispatchObserver(
   runtime.observersInFlight.set(runId, { controller, coversUpToId });
 
   const { text: chunkText } = serializeSourceAddressedBranchEntries(slice.entries);
+  const sourceEntryIds = slice.entries.map((entry) => entry.id);
   const lastEntry = slice.entries.at(-1);
 
   runtime.status.workerStart("observer", runId);
@@ -148,7 +149,7 @@ async function dispatchObserver(
     });
 
     if (observations.length > 0) {
-      pi.appendEntry(OM_OBSERVATIONS_RECORDED, { observations, coversUpToId });
+      pi.appendEntry(OM_OBSERVATIONS_RECORDED, { observations, coversUpToId, sourceEntryIds });
     }
     runtime.status.workerDone(runId, observations.length);
     runtime.refreshFooterGauges(ctx.sessionManager.getBranch(), ctx.getContextUsage?.()?.tokens ?? null);

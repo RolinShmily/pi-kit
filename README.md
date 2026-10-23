@@ -90,22 +90,37 @@ Each top-level directory is a self-contained extension (`<name>/index.ts` + `REA
 
 ## Development & Publishing
 
-[kit.config.json](kit.config.json) defines which extensions are bundled into `@rol1n/pi-kit` (`bundle: true`) and declares inter-extension dependencies (`deps`).
+[kit.config.json](kit.config.json) controls bundle selection (`bundle`), inter-extension dependencies (`deps`), and release versions. The top-level `version` belongs to `@rol1n/pi-kit`; each extension can set its own `version`, otherwise it inherits the top-level version. Set explicit extension versions to release the kit and standalone packages independently.
+
+### Automated releases
+
+1. Update the code and bump the relevant version(s) in `kit.config.json`.
+2. Push to `main` with changes to `kit.config.json` or `package.json`, or manually run **Publish to npm** in GitHub Actions. Changes to the packaging script or workflow also trigger a release run.
+3. CI runs the same pipeline for both triggers:
 
 ```sh
-# Sync package.json from kit.config.json and validate all extensions
+npm run manifest
+npm run check
+npm run publish:ci -- all
+```
+
+The workflow in [`.github/workflows/publish.yml`](.github/workflows/publish.yml) generates `package.json`, validates the layout, then publishes all standalone extensions in dependency order, followed by the kit. Already-published versions are skipped; versions are never bumped automatically. `bundle: false` excludes an extension from the kit, not from standalone publishing. Publishing runs do not overlap, and a new run does not cancel an active release. Code-only pushes do not trigger publishing.
+
+You do not need to run `manifest` or publish locally for an npm release. CI generates the manifest only in its checkout and does not commit it back. For local or Git installs, run `npm run manifest` and commit the generated `package.json` when changing bundle selection or versions so the repository manifest stays in sync.
+
+### Local development and manual publishing
+
+```sh
+# Sync the local manifest and validate all extensions
 npm run manifest
 npm run check
 
 # Stage a standalone package into dist/<id>
 npm run prepare:extension -- memory-log
 
-# Publish updated packages (extensions, kit, all, or a single extension ID)
-npm run publish:ci -- extensions
-npm run publish:ci -- kit
+# Optional local release; also accepts extensions, kit, or a single extension ID
+npm run publish:ci -- all
 ```
-
-Automated releases run via GitHub Actions in [`.github/workflows/publish.yml`](.github/workflows/publish.yml).
 
 ---
 

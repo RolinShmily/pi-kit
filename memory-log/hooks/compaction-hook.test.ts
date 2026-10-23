@@ -1,8 +1,13 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert";
-import { snapCutoff, snapFirstKeptEntryId } from "./compaction-hook.ts";
-import { contextPressureTokens, turnWillContinue } from "./compaction-trigger.ts";
-import { OM_OBSERVATIONS_RECORDED, type Entry } from "../ledger/index.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { canSkipObserverWait, registerCompactionHook, snapCutoff, snapFirstKeptEntryId } from "./compaction-hook.ts";
+import { contextPressureTokens } from "./compaction-trigger.ts";
+import { OM_OBSERVATIONS_DROPPED, OM_OBSERVATIONS_RECORDED, type Entry } from "../ledger/index.ts";
+import type { Runtime } from "../runtime.ts";
 
 function makeMessageEntry(id: string, role: "user" | "assistant", text: string): Entry {
   return {
@@ -15,13 +20,14 @@ function makeMessageEntry(id: string, role: "user" | "assistant", text: string):
   };
 }
 
-function makeObservationEntry(id: string, coversUpToId: string): Entry {
+function makeObservationEntry(id: string, coversUpToId: string, sourceEntryIds?: string[]): Entry {
   return {
     type: "custom",
     customType: OM_OBSERVATIONS_RECORDED,
     id,
     data: {
       coversUpToId,
+      sourceEntryIds,
       observations: [
         {
           timestamp: "2026-09-10T12:00:00",
@@ -118,7 +124,7 @@ test("snapCutoff: handles multiple compactions and respects the latest compactio
   assert.strictEqual(snap.tail, 100);
 });
 
-test("snapCutoff: falls back to proposedFirstKeptId when all chunk boundaries are before prior compaction", () => {
+test("snapCutoff: refuses an unproven proposed cutoff when all boundaries precede the last compaction", () => {
   const branch: Entry[] = [
     makeMessageEntry("m0", "user", "a".repeat(400)),
     makeMessageEntry("m1", "assistant", "b".repeat(400)),
@@ -129,9 +135,9 @@ test("snapCutoff: falls back to proposedFirstKeptId when all chunk boundaries ar
   ];
 
   // No observation chunk boundaries exist after c1.
-  // snapCutoff must fall back to proposedFirstKeptId.
+  // Let the hook delegate to native summarization, never use an unobserved cut.
   const snap = snapCutoff(branch, "m2", 100);
-  assert.strictEqual(snap.firstKeptId, "m2");
+  assert.strictEqual(snap.firstKeptId, undefined);
   assert.strictEqual(snap.tail, undefined);
 });
 
@@ -216,10 +222,139 @@ test("contextPressureTokens: triggers when threshold is exceeded after assistant
   assert.strictEqual(contextPressureTokens(ctxNull, 500).due, false);
 });
 
-test("turnWillContinue: correctly detects continuation", () => {
-  assert.strictEqual(turnWillContinue({ toolResults: [{ toolCallId: "1" }] }), true);
-  assert.strictEqual(turnWillContinue({ message: { stopReason: "tool_use" } }), true);
-  assert.strictEqual(turnWillContinue({ message: { stopReason: "tool_calls" } }), true);
-  assert.strictEqual(turnWillContinue({ message: { stopReason: "stop" } }), false);
-  assert.strictEqual(turnWillContinue({ message: { stopReason: "error" } }), false);
+test("snapCutoff: later completed workers cannot skip an earlier observation gap", () => {
+  const branch = [
+    makeMessageEntry("m0", "user", "first chunk"),
+    makeMessageEntry("m1", "assistant", "first answer"),
+    makeMessageEntry("m2", "user", "second chunk"),
+    makeMessageEntry("m3", "assistant", "second answer"),
+    makeObservationEntry("late", "m3", ["m2", "m3"]),
+    makeMessageEntry("m4", "user", "unobserved tail"),
+  ];
+  assert.strictEqual(snapCutoff(branch, "m4", 0).firstKeptId, undefined);
+  branch.push(makeObservationEntry("early", "m1", ["m0", "m1"]));
+  assert.strictEqual(snapCutoff(branch, "m4", 0).firstKeptId, "m4");
+});
+
+test("snapCutoff: coverage from a later overlapping chunk cannot authorize an earlier projection", () => {
+  const branch = [
+    makeMessageEntry("m0", "user", "only in later chunk"),
+    makeMessageEntry("m1", "assistant", "early chunk"),
+    makeObservationEntry("early", "m1", ["m1"]),
+    makeMessageEntry("m2", "user", "later chunk"),
+    makeObservationEntry("late", "m2", ["m0", "m2"]),
+    makeMessageEntry("tail", "user", "tail"),
+  ];
+  // m1's apparent boundary would omit the only memory of m0.
+  assert.strictEqual(snapCutoff(branch, "m2", 1000).firstKeptId, "tail");
+});
+
+test("snapCutoff: never splits an assistant call from its tool result", () => {
+  const branch: Entry[] = [
+    makeMessageEntry("m0", "assistant", "tool call"),
+    makeObservationEntry("obs", "m0", ["m0"]),
+    { type: "message", id: "result", message: { role: "toolResult", content: "output" } },
+    makeMessageEntry("m1", "assistant", "tail"),
+  ];
+  assert.strictEqual(snapCutoff(branch, "m1", 0).firstKeptId, undefined);
+});
+
+test("snapCutoff: invalid and off-branch anchors cannot authorize a cut", () => {
+  for (const ids of [["missing"], ["m1", "m0"], [], ["m0", "missing", "m1"]]) {
+    const branch = [makeMessageEntry("m0", "user", "raw"), makeMessageEntry("m1", "assistant", "raw"), makeObservationEntry("obs", "m1", ids), makeMessageEntry("tail", "user", "tail")];
+    assert.strictEqual(snapCutoff(branch, "tail", 0).firstKeptId, undefined);
+  }
+});
+
+function hookFixture(t: TestContext, initialBranch: Entry[]) {
+  const memoryRoot = mkdtempSync(join(tmpdir(), "memory-hook-test-"));
+  t.after(() => rmSync(memoryRoot, { recursive: true, force: true }));
+  let branch = initialBranch;
+  let hook!: (event: any, ctx: any) => Promise<any>;
+  let waits = 0;
+  const runtime = {
+    enabled: true,
+    config: { passive: false, tailTokens: 100 },
+    memoryRoot,
+    compactHookInFlight: false,
+    observersInFlight: new Map(),
+    ensureConfig() {},
+    async whenObserversIdle() { waits++; },
+  } as unknown as Runtime;
+  registerCompactionHook({ on(_name: string, handler: typeof hook) { hook = handler; } } as unknown as ExtensionAPI, runtime);
+  const event = { preparation: { firstKeptEntryId: "tail", tokensBefore: 1000 }, branchEntries: initialBranch, signal: new AbortController().signal };
+  const ctx = { cwd: memoryRoot, hasUI: false, sessionManager: { getBranch: () => branch } };
+  return { runtime, event, ctx, run: () => hook(event, ctx), setBranch(next: Entry[]) { branch = next; }, waits: () => waits };
+}
+
+function observedBranch(): Entry[] {
+  return [makeMessageEntry("m0", "user", "observed raw text"), makeObservationEntry("obs", "m0", ["m0"]), makeMessageEntry("tail", "user", "unobserved tail")];
+}
+
+test("hook: manual early compaction and failed observers fall back to native summary", async (t) => {
+  const f = hookFixture(t, [makeMessageEntry("m0", "user", "raw text"), makeMessageEntry("tail", "assistant", "not yet observed")]);
+  assert.strictEqual(await f.run(), undefined);
+  assert.strictEqual(f.runtime.compactHookInFlight, false);
+  assert.strictEqual(f.waits(), 1);
+});
+
+test("hook: preserves the whole unobserved tail, even when it exceeds the target", async (t) => {
+  const branch = observedBranch();
+  branch.push(makeMessageEntry("newer", "assistant", "x".repeat(2000)));
+  const f = hookFixture(t, branch);
+  f.event.preparation.firstKeptEntryId = "newer";
+  const result = await f.run();
+  assert.strictEqual(result.compaction.firstKeptEntryId, "tail");
+  assert.match(result.compaction.summary, /Observation content/);
+  assert.strictEqual(result.compaction.tokensBefore, 1000);
+});
+
+test("hook: waits then rereads the branch to use a newly committed observer", async (t) => {
+  const f = hookFixture(t, [makeMessageEntry("m0", "user", "raw text"), makeMessageEntry("tail", "user", "tail")]);
+  f.runtime.whenObserversIdle = async () => { f.setBranch(observedBranch()); };
+  const result = await f.run();
+  assert.strictEqual(result.compaction.firstKeptEntryId, "tail");
+});
+
+test("hook: empty memory (all observations archived, no files) uses native summarization", async (t) => {
+  const branch = observedBranch();
+  branch.push({ type: "custom", id: "drop", customType: OM_OBSERVATIONS_DROPPED, data: { observationTimestamps: ["2026-09-10T12:00:00"], coversUpToId: "m0" } });
+  const f = hookFixture(t, branch);
+  assert.strictEqual(await f.run(), undefined);
+  writeFileSync(join(f.runtime.memoryRoot, "JOURNEY.md"), "Previous milestones");
+  writeFileSync(join(f.runtime.memoryRoot, "auth.md"), "---\nsummary: Authentication design\n---\nDetails");
+  const result = await f.run();
+  assert.match(result.compaction.summary, /Previous milestones/);
+  assert.match(result.compaction.summary, /Authentication design/);
+});
+
+test("hook: a previous compaction without a new observed boundary uses native summary", async (t) => {
+  const branch = observedBranch();
+  branch.splice(2, 0, makeCompactionEntry("c1", "m0"));
+  const f = hookFixture(t, branch);
+  assert.strictEqual(await f.run(), undefined);
+});
+
+test("hook: disabled, passive, duplicate and aborted requests are safe", async (t) => {
+  const f = hookFixture(t, observedBranch());
+  f.runtime.enabled = false;
+  assert.strictEqual(await f.run(), undefined);
+  f.runtime.enabled = true;
+  f.runtime.config.passive = true;
+  assert.strictEqual(await f.run(), undefined);
+  f.runtime.config.passive = false;
+  f.runtime.compactHookInFlight = true;
+  assert.deepStrictEqual(await f.run(), { cancel: true });
+  f.runtime.compactHookInFlight = false;
+  f.event.signal = AbortSignal.abort();
+  assert.deepStrictEqual(await f.run(), { cancel: true });
+});
+
+test("observer wait: skip only when a safe cut fits the tail and in-flight chunks lie after it", () => {
+  const branch = observedBranch();
+  assert.strictEqual(canSkipObserverWait(branch, "tail", 10, 100, []), true);
+  assert.strictEqual(canSkipObserverWait(branch, undefined, undefined, 100, []), false);
+  assert.strictEqual(canSkipObserverWait(branch, "tail", 200, 100, []), false);
+  assert.strictEqual(canSkipObserverWait(branch, "tail", 10, 100, [{ coversUpToId: "m0" }]), false);
+  assert.strictEqual(canSkipObserverWait(branch, "tail", 10, 100, [{ coversUpToId: "missing" }]), false);
 });

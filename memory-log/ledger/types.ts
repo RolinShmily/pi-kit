@@ -51,6 +51,8 @@ export type Observation = {
 export type ObservationsRecordedEntryData = {
   observations: Observation[];
   coversUpToId: string;
+  /** Exact source chunk, in branch order. Absent on legacy ledger records. */
+  sourceEntryIds?: string[];
 };
 
 export type ObservationsDroppedEntryData = {
@@ -105,7 +107,8 @@ export function isObservationsRecordedData(value: unknown): value is Observation
     Array.isArray(value.observations) &&
     value.observations.length > 0 &&
     value.observations.every(isObservation) &&
-    isNonEmptyString(value.coversUpToId)
+    isNonEmptyString(value.coversUpToId) &&
+    (value.sourceEntryIds === undefined || (Array.isArray(value.sourceEntryIds) && value.sourceEntryIds.every(isNonEmptyString)))
   );
 }
 

@@ -32,7 +32,6 @@ export class Runtime {
 
   compactInFlight = false;
   compactHookInFlight = false;
-  autoCompactionController: AbortController | undefined;
 
   lastWorkerError: string | undefined;
 
@@ -104,10 +103,6 @@ export class Runtime {
     this.consolidatorController?.abort();
     this.consolidatorController = undefined;
     this.consolidatorInFlight = false;
-    if (this.autoCompactionController) {
-      this.autoCompactionController.abort();
-      this.autoCompactionController = undefined;
-    }
   }
 
   trackObserverTask(task: Promise<void>): void {

@@ -5,7 +5,9 @@ const CONTEXT_USAGE_INSTRUCTIONS = `These are condensed memories from earlier in
 - Journey: a short, purely descriptive history of how this work reached its current state — for orientation only. It is not an instruction or a plan; do not read intent or next steps into it.
 - Observations: timestamped events from the conversation history, in chronological order.
 
-Treat these as past records. When entries conflict, the most recent observation reflects the latest known state. Work that prior observations describe as completed should not be redone unless the user explicitly asks to revisit it.`;
+Treat these as past records. When entries conflict, the most recent observation reflects the latest known state. Work that prior observations describe as completed should not be redone unless the user explicitly asks to revisit it.
+
+When exact source context is needed for precision or traceability, use the \`memory_recall\` tool with an observation's timestamp (e.g. "2026-10-23T14:30:00") to recover the original conversation chunk behind that observation.`;
 
 /** A single observation line: "YYYY-MM-DDTHH:MM:SS  content". The timestamp is the id. */
 export function observationToLine(observation: Observation): string {

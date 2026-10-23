@@ -90,22 +90,37 @@ pi update --extensions
 
 ## 构建与发布
 
-[kit.config.json](kit.config.json) 统一管理哪些扩展纳入 `@rol1n/pi-kit`（`bundle: true`）以及扩展间的依赖关系（`deps`）。
+[kit.config.json](kit.config.json) 统一管理聚合包选择（`bundle`）、扩展间的依赖关系（`deps`）与发布版本。顶层 `version` 属于 `@rol1n/pi-kit`；各扩展可以单独设置 `version`，未设置时继承顶层版本。为每个扩展显式设置版本即可让聚合包与独立包分别升级。
+
+### 自动发布
+
+1. 修改代码，并在 `kit.config.json` 中提升需要发布的包的版本。
+2. 将包含 `kit.config.json` 或 `package.json` 变更的提交推送到 `main`，或在 GitHub Actions 手动运行 **Publish to npm**。修改打包脚本或工作流本身也会触发发布流程。
+3. 自动和手动触发均执行同一条流水线：
 
 ```sh
-# 从 kit.config.json 同步生成 package.json 并校验所有扩展
+npm run manifest
+npm run check
+npm run publish:ci -- all
+```
+
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml) 会生成 `package.json`、校验扩展布局，再按依赖顺序发布所有独立扩展，最后发布聚合包。已存在的版本自动跳过，不会自动提升版本号。`bundle: false` 只表示不纳入聚合包，不影响独立发布。发布流程不会并行执行，新触发的流程也不会取消正在进行的发布。仅修改扩展代码不会触发发布。
+
+发布 npm 包无需本地运行 `manifest` 或 `publish`。CI 只在运行目录中生成清单，不会自动提交回仓库。若使用本地或 Git 安装，调整聚合包选择或版本后仍应运行 `npm run manifest` 并提交生成的 `package.json`，保持仓库清单同步。
+
+### 本地开发与手动发布
+
+```sh
+# 同步本地清单并校验所有扩展
 npm run manifest
 npm run check
 
 # 将单个扩展构建到 dist/<id>
 npm run prepare:extension -- memory-log
 
-# 发布更新（支持 extensions、kit、all 或单个扩展 ID）
-npm run publish:ci -- extensions
-npm run publish:ci -- kit
+# 可选的本地发布，也支持 extensions、kit 或单个扩展 ID
+npm run publish:ci -- all
 ```
-
-GitHub Actions 自动发布工作流位于 [`.github/workflows/publish.yml`](.github/workflows/publish.yml)。
 
 ---
 

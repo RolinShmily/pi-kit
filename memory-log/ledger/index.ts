@@ -5,3 +5,4 @@ export * from "./projection.ts";
 export * from "./pool.ts";
 export * from "./render.ts";
 export * from "./serialize.ts";
+export * from "./recall.ts";

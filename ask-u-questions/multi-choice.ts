@@ -254,5 +254,8 @@ export async function askMultiChoice(
         },
       };
     },
+    {
+      blocked: { kind: "question", message: question },
+    },
   );
 }

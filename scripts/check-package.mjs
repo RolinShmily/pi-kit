@@ -46,7 +46,7 @@ for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-agent-core", "@
 for (const exclusion of ["!**/test/**", "!**/tests/**", "!**/*.{test,spec}.{ts,js,mjs,cjs}", "!**/.env", "!**/.env.*"]) {
   assert.ok(manifest.files.includes(exclusion), `Missing package exclusion: ${exclusion}`);
 }
-for (const path of ["LICENSE", "README.md", "README_zh.md", "scripts/check-package.mjs"]) {
+for (const path of ["LICENSE", "README.md", "README_zh.md", "CHANGELOG.md", "scripts/check-package.mjs"]) {
   assert.ok(existsSync(join(root, path)), `Missing ${path}`);
 }
 

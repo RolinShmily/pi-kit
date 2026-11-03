@@ -1,6 +1,6 @@
 {
   "name": "@rol1n/pi-kit",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "A selectable collection of Pi extensions, prompt templates, and skills.",
   "author": "RoL1n_SrP",
   "license": "MIT",
@@ -28,6 +28,7 @@
     "access": "public"
   },
   "files": [
+    "CHANGELOG.md",
     "README_zh.md",
     "scripts/check-package.mjs",
     "prompts",

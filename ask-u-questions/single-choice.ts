@@ -176,5 +176,8 @@ export async function askSingleChoice(
         },
       };
     },
+    {
+      blocked: { kind: "question", message: question },
+    },
   );
 }

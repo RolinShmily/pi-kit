@@ -5,6 +5,11 @@ All notable changes to the `@rol1n/pi-kit` package will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-11-09
+
+### Changed
+- Releases are now driven only by `v*` tag pushes: the tag publishes to npm and `CHANGELOG.md` for that version becomes the GitHub Release body.
+
 ## [0.2.1] - 2026-11-09
 
 ### Removed

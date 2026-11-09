@@ -93,7 +93,7 @@ pi update --extensions
 
 根目录 [`prompts/`](prompts/) 是独立、标准的 Pi 资源，在 `package.json` 中通过 `"pi": { "prompts": ["./prompts"] }` 声明，不属于、也不依赖 `prompt-snipaste` 扩展。
 
-模板会成为普通 Pi 斜杠命令：[/ask-questions](prompts/ask-questions.md)、[/delegate-exploration](prompts/delegate-exploration.md)、[/diagnose-report](prompts/diagnose-report.md)、[/frontend-tech-preset](prompts/frontend-tech-preset.md)、[/orchestrator-mode](prompts/orchestrator-mode.md)、[/session-kickoff](prompts/session-kickoff.md)、[/verify-not-assume](prompts/verify-not-assume.md)。即使禁用 `prompt-snipaste`，或配置 `"extensions": []`，这些模板仍可单独使用。
+模板会成为普通 Pi 斜杠命令：[/ask-questions](prompts/ask-questions.md)、[/delegate-exploration](prompts/delegate-exploration.md)、[/diagnose-report](prompts/diagnose-report.md)、[/orchestrator-mode](prompts/orchestrator-mode.md)、[/session-kickoff](prompts/session-kickoff.md)、[/verify-not-assume](prompts/verify-not-assume.md)。即使禁用 `prompt-snipaste`，或配置 `"extensions": []`，这些模板仍可单独使用。
 
 如需只部署本地检出目录中的模板，可通过顶层 `prompts` 引用，无需加载任何扩展：
 

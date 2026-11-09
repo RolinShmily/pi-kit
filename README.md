@@ -93,7 +93,7 @@ Remove older local copies from configured skill locations to avoid duplicate ski
 
 The root [`prompts/`](prompts/) directory is an independent, standard Pi resource, declared as `"pi": { "prompts": ["./prompts"] }` in `package.json`. It does not belong to or require the `prompt-snipaste` extension.
 
-Templates become normal Pi slash commands: [/ask-questions](prompts/ask-questions.md), [/delegate-exploration](prompts/delegate-exploration.md), [/diagnose-report](prompts/diagnose-report.md), [/frontend-tech-preset](prompts/frontend-tech-preset.md), [/orchestrator-mode](prompts/orchestrator-mode.md), [/session-kickoff](prompts/session-kickoff.md), and [/verify-not-assume](prompts/verify-not-assume.md). They remain available when `prompt-snipaste` is disabled, or even with `"extensions": []`.
+Templates become normal Pi slash commands: [/ask-questions](prompts/ask-questions.md), [/delegate-exploration](prompts/delegate-exploration.md), [/diagnose-report](prompts/diagnose-report.md), [/orchestrator-mode](prompts/orchestrator-mode.md), [/session-kickoff](prompts/session-kickoff.md), and [/verify-not-assume](prompts/verify-not-assume.md). They remain available when `prompt-snipaste` is disabled, or even with `"extensions": []`.
 
 To use only the directory from a local checkout, reference it through the top-level `prompts` setting; no extension needs to be loaded:
 

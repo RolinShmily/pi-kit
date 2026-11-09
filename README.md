@@ -189,11 +189,16 @@ npm pack --dry-run --ignore-scripts # Inspect the npm package contents
 
 ### Releases
 
-1. Make your changes and bump `version` directly in `package.json`.
-2. Push to `main`, or manually run **Publish to npm** in GitHub Actions.
-3. [The workflow](.github/workflows/publish.yml) validates the package, runs tests, and publishes **only the root `@rol1n/pi-kit` package** with npm provenance. Existing versions are skipped; registry/network errors fail the job rather than being treated as an unpublished version.
+Tag pushes are the only release trigger; branch pushes never publish.
 
-Automatic runs watch `package.json`, the validation script, and the workflow itself. Code-only pushes do not publish; bump the version when ready to release. Runs are serialized without cancelling an active publish. CI uses the configured npm Trusted Publisher, or `NPM_TOKEN` if provided, and never rewrites the manifest or bumps versions.
+1. Bump `version` in `package.json` and add the matching `## [x.y.z]` section to [`CHANGELOG.md`](CHANGELOG.md).
+2. Tag the commit and push the tag: `git tag -a v0.2.2 -m v0.2.2 && git push origin v0.2.2`.
+3. [The release workflow](.github/workflows/publish.yml) runs on `v*` tags: it validates the package, fails when the tag and the `package.json` version disagree, runs tests, and publishes **only the root `@rol1n/pi-kit` package** with npm provenance. Existing versions are skipped; registry/network errors fail the job rather than being treated as an unpublished version.
+4. The same run then creates a GitHub Release named after the tag, with that version's `CHANGELOG.md` section as its body; prerelease versions (`x.y.z-*`) are marked as GitHub pre-releases. An existing release is left untouched, so re-pushing a tag cannot duplicate it.
+
+Release notes are extracted by [`scripts/changelog-section.mjs`](scripts/changelog-section.mjs), which exits non-zero when the version has no `CHANGELOG.md` section or that section is empty, so a tag never ships an empty release body.
+
+`workflow_dispatch` remains available for a manual npm-only publish. Runs are serialized without cancelling a release already in progress. CI uses the configured npm Trusted Publisher, or `NPM_TOKEN` if provided, and never rewrites the manifest or bumps versions.
 
 For an authorized local release, use the normal npm command: `npm publish --access public`.
 

@@ -189,11 +189,16 @@ npm pack --dry-run --ignore-scripts # 检查 npm 包内容
 
 ### 发布
 
-1. 修改代码，直接提升 `package.json` 中的 `version`。
-2. 推送到 `main`，或在 GitHub Actions 手动运行 **Publish to npm**。
-3. [工作流](.github/workflows/publish.yml) 校验清单、运行测试，随后**仅发布根目录的 `@rol1n/pi-kit`**，附带 npm provenance。已发布版本自动跳过；查询遇到网络或注册表错误会使任务失败，不会误判为尚未发布。
+只有推送 tag 会触发发布，推送分支不会发布。
 
-自动触发范围是 `package.json`、校验脚本和工作流本身。仅修改扩展代码不会发布，准备发布时请提升版本。任务串行执行，不取消进行中的发布。CI 使用已配置的 npm Trusted Publisher，或提供的 `NPM_TOKEN`；不会重写清单或自动升级版本。
+1. 提升 `package.json` 中的 `version`，并在 [`CHANGELOG.md`](CHANGELOG.md) 中添加对应的 `## [x.y.z]` 段落。
+2. 打 tag 并推送：`git tag -a v0.2.2 -m v0.2.2 && git push origin v0.2.2`。
+3. [发布工作流](.github/workflows/publish.yml) 在 `v*` tag 上运行：校验清单，tag 与 `package.json` 版本不一致时直接失败，运行测试，随后**仅发布根目录的 `@rol1n/pi-kit`**，附带 npm provenance。已发布版本自动跳过；查询遇到网络或注册表错误会使任务失败，不会误判为尚未发布。
+4. 同一次运行接着创建以 tag 命名的 GitHub Release，内容取自该版本在 `CHANGELOG.md` 中的段落；预发布版本（`x.y.z-*`）会标记为 GitHub pre-release。已存在的 Release 不会被覆盖，重复推送 tag 不会产生重复条目。
+
+发布说明由 [`scripts/changelog-section.mjs`](scripts/changelog-section.mjs) 提取：版本缺少对应段落或段落为空时以非零码退出，因此 tag 不会带着空发布说明上线。
+
+如需手动发布到 npm，可使用 `workflow_dispatch`。任务串行执行，不取消进行中的发布。CI 使用已配置的 npm Trusted Publisher，或提供的 `NPM_TOKEN`；不会重写清单或自动升级版本。
 
 如需经授权后在本地发布，直接使用标准命令：`npm publish --access public`。
 

@@ -1,6 +1,6 @@
 {
   "name": "@rol1n/pi-kit",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A selectable collection of Pi extensions, prompt templates, and skills.",
   "author": "RoL1n_SrP",
   "license": "MIT",
@@ -21,7 +21,7 @@
   },
   "scripts": {
     "check": "node scripts/check-package.mjs",
-    "test": "node --experimental-strip-types --test memory-log/hooks/*.test.ts memory-log/ledger/*.test.ts prompt-snipaste/*.test.ts scripts/*.test.mjs",
+    "test": "node --experimental-strip-types --test custom-providers/*.test.ts memory-log/hooks/*.test.ts memory-log/ledger/*.test.ts prompt-snipaste/*.test.ts scripts/*.test.mjs",
     "prepack": "npm run check"
   },
   "publishConfig": {

@@ -18,10 +18,28 @@ type MagpieClassifierModelConfig = ClassifierModelConfig & {
 
 type MagpieDiscoveredModelConfig = MagpieChatModelConfig | MagpieClassifierModelConfig;
 
-// Authenticate with a Magpie gateway key via /login magpie (stored in Pi's
-// auth.json) or MAGPIE_GATEWAY_KEY. This is not an upstream provider API key.
+// Authenticate with a Magpie gateway key via /login magpie-lan (stored in Pi's
+// auth.json) or MAGPIE_LAN_GATEWAY_KEY / MAGPIE_GATEWAY_KEY. This is not an upstream provider API key.
 
-const BASE_URL = process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:3425/v1";
+function getBaseUrl(): string {
+  return process.env.MAGPIE_LAN_BASE_URL ?? process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:3425/v1";
+}
+
+function resolveGatewayKey(): string | undefined {
+  return process.env.MAGPIE_LAN_GATEWAY_KEY
+    ?? process.env.MAGPIE_GATEWAY_KEY
+    ?? process.env.MAGPIE_LAN_API_KEY
+    ?? process.env.MAGPIE_API_KEY;
+}
+
+function resolveGatewayApiKeyEnvVar(): string | undefined {
+  if (process.env.MAGPIE_LAN_GATEWAY_KEY) return "$MAGPIE_LAN_GATEWAY_KEY";
+  if (process.env.MAGPIE_GATEWAY_KEY) return "$MAGPIE_GATEWAY_KEY";
+  if (process.env.MAGPIE_LAN_API_KEY) return "$MAGPIE_LAN_API_KEY";
+  if (process.env.MAGPIE_API_KEY) return "$MAGPIE_API_KEY";
+  return undefined;
+}
+
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 
@@ -159,13 +177,13 @@ function toChatModel(entry: Record<string, unknown> & { id: string }, gatewayUrl
 }
 
 export const refreshMagpieModels = async (context: RefreshContext): Promise<ProviderModelConfig[]> => {
-  const gatewayUrl = (context.baseUrl ?? BASE_URL).replace(/\/+$/, "").replace(/\/v1$/, "");
+  const gatewayUrl = (context.baseUrl ?? getBaseUrl()).replace(/\/+$/, "").replace(/\/v1$/, "");
   // Keep the entire snapshot: rebuilding from IDs would silently turn native
   // Messages/Responses/Gemini/System One models back into Chat and discard capabilities.
   // Reject snapshots from another gateway, including during offline startup:
   // otherwise a changed gateway/key could send future prompts to the old host.
   const cached = (context.stored?.models ?? [])
-    .filter((model): model is AnyModel => model.provider === "magpie")
+    .filter((model): model is AnyModel => model.provider === "magpie-lan" || model.provider === "magpie")
     .filter((model) => {
       const type = model.type ?? "chat";
       if (type === "classifier") {
@@ -179,27 +197,37 @@ export const refreshMagpieModels = async (context: RefreshContext): Promise<Prov
       }
       return false;
     })
-    .map((model) => ({ ...model }));
+    .map((model) => ({ ...model, provider: "magpie-lan" }));
   if (!context.allowNetwork || context.signal.aborted) return cached;
   const key = context.credential?.type === "api_key"
     ? context.credential.key
-    : process.env.MAGPIE_GATEWAY_KEY;
+    : resolveGatewayKey();
   if (!key) return cached;
 
   // Magpie accepts a gateway key in Bearer, x-api-key, or ?key=; avoid URL/log leakage.
   // Send X-Magpie-Deciders to include System One decision models, and X-Magpie-Prices for prices.
-  const response = await fetch(`${gatewayUrl}/v1/models`, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "X-Magpie-Deciders": "1",
-      "X-Magpie-Prices": "1",
-    },
-    signal: context.signal,
-  });
-  if (!response.ok) throw new Error(`Magpie model discovery failed (HTTP ${response.status})`);
-  const catalog: unknown = await response.json();
+  let catalog: unknown;
+  try {
+    const response = await fetch(`${gatewayUrl}/v1/models`, {
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "X-Magpie-Deciders": "1",
+        "X-Magpie-Prices": "1",
+      },
+      signal: context.signal,
+    });
+    if (!response.ok) {
+      if (cached.length > 0) return cached;
+      throw new Error(`Magpie LAN model discovery failed (HTTP ${response.status})`);
+    }
+    catalog = await response.json();
+  } catch (error) {
+    if (context.signal.aborted || cached.length > 0) return cached;
+    throw error;
+  }
   if (!isRecord(catalog) || !Array.isArray(catalog.data)) {
-    throw new Error("Magpie model discovery returned an invalid /v1/models response");
+    if (cached.length > 0) return cached;
+    throw new Error("Magpie LAN model discovery returned an invalid /v1/models response");
   }
 
   const discovered = new Map<string, MagpieDiscoveredModelConfig>();
@@ -222,7 +250,7 @@ export const refreshMagpieModels = async (context: RefreshContext): Promise<Prov
       checkedAt: Date.now(),
       models: models.map((model) => ({
         ...model,
-        provider: "magpie",
+        provider: "magpie-lan",
       })),
     },
   });
@@ -241,10 +269,14 @@ async function loadTypesafeSystemOneClassifier() {
 }
 
 export const magpieChatProvider = {
-  name: "Magpie",
-  baseUrl: BASE_URL,
+  name: "magpie-lan",
+  get baseUrl() {
+    return getBaseUrl();
+  },
   api: "openai-completions",
-  apiKey: "$MAGPIE_GATEWAY_KEY",
+  get apiKey() {
+    return resolveGatewayApiKeyEnvVar();
+  },
   models: [],
   refreshModels: refreshMagpieModels,
   classifiers: {

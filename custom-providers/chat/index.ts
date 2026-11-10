@@ -9,7 +9,7 @@ const BIGMODEL_BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
 const DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
 export const chatProviders: ModalityProvidersRecord = {
-  magpie: magpieChatProvider,
+  "magpie-lan": magpieChatProvider,
   bigmodel: {
     name: "BigModel (智谱)",
     baseUrl: BIGMODEL_BASE_URL,

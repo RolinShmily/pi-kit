@@ -5,6 +5,11 @@ All notable changes to the `@rol1n/pi-kit` package will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-11-17
+
+### Fixed
+- `custom-providers` / `magpie-lan`: a gateway on this machine no longer asks for an API key. Magpie's gateway listens on loopback and accepts any token there (`gateway.Token` is the literal `magpie`, which magpie itself writes into an agent's config), but Pi hides a provider whose auth cannot resolve, so the provider now falls back to that local token instead of requiring `MAGPIE_*_GATEWAY_KEY` or `/login magpie-lan`. Model discovery also runs over loopback without a key. A gateway beyond loopback (`MAGPIE_LAN_BASE_URL` on the LAN, sharing on) still needs a real gateway key; a stored `/login` credential still takes precedence over the local token.
+
 ## [0.2.4] - 2026-11-10
 
 ### Changed

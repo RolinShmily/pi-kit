@@ -20,24 +20,52 @@ type MagpieDiscoveredModelConfig = MagpieChatModelConfig | MagpieClassifierModel
 
 // Authenticate with a Magpie gateway key via /login magpie-lan (stored in Pi's
 // auth.json) or MAGPIE_LAN_GATEWAY_KEY / MAGPIE_GATEWAY_KEY. This is not an upstream provider API key.
+//
+// A gateway on loopback needs no key: magpie listens on 127.0.0.1 and accepts any
+// token there ("Loopback remains permissive: any token works"), and writes the
+// literal token "magpie" into an agent's config itself (gateway.Token in
+// internal/gateway/gateway.go). Pi, however, hides a provider whose auth cannot
+// resolve, so a keyless local gateway must still resolve to that token:
+// https://github.com/yetone/magpie/blob/main/docs/integrating.md
+// https://github.com/yetone/magpie/blob/main/docs/reference.md
+const LOCAL_GATEWAY_TOKEN = "magpie";
 
 function getBaseUrl(): string {
   return process.env.MAGPIE_LAN_BASE_URL ?? process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:3425/v1";
 }
 
-function resolveGatewayKey(): string | undefined {
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return host === "127.0.0.1" || host === "localhost" || host === "::1" || host.endsWith(".localhost");
+}
+
+// Only a gateway on this machine lets any token in. A shared gateway (LAN
+// sharing, MAGPIE_ADDR on an interface, another computer) needs a real gateway
+// key, so this fallback must not apply there.
+function localGatewayToken(baseUrl: string): string | undefined {
+  try {
+    return isLoopbackHostname(new URL(baseUrl).hostname) ? LOCAL_GATEWAY_TOKEN : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveGatewayKey(baseUrl: string): string | undefined {
   return process.env.MAGPIE_LAN_GATEWAY_KEY
     ?? process.env.MAGPIE_GATEWAY_KEY
     ?? process.env.MAGPIE_LAN_API_KEY
-    ?? process.env.MAGPIE_API_KEY;
+    ?? process.env.MAGPIE_API_KEY
+    ?? localGatewayToken(baseUrl);
 }
 
-function resolveGatewayApiKeyEnvVar(): string | undefined {
+function resolveGatewayApiKeyEnvVar(baseUrl: string): string | undefined {
   if (process.env.MAGPIE_LAN_GATEWAY_KEY) return "$MAGPIE_LAN_GATEWAY_KEY";
   if (process.env.MAGPIE_GATEWAY_KEY) return "$MAGPIE_GATEWAY_KEY";
   if (process.env.MAGPIE_LAN_API_KEY) return "$MAGPIE_LAN_API_KEY";
   if (process.env.MAGPIE_API_KEY) return "$MAGPIE_API_KEY";
-  return undefined;
+  // A literal, not "$NAME": Pi reports the provider as configured without a
+  // /login prompt. A stored /login credential still takes precedence in Pi.
+  return localGatewayToken(baseUrl);
 }
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -201,8 +229,12 @@ export const refreshMagpieModels = async (context: RefreshContext): Promise<Prov
   if (!context.allowNetwork || context.signal.aborted) return cached;
   const key = context.credential?.type === "api_key"
     ? context.credential.key
-    : resolveGatewayKey();
+    : resolveGatewayKey(gatewayUrl);
   if (!key) return cached;
+  // A local gateway on its own token may simply not be running: magpie being off
+  // is the normal state for anyone who keeps this provider registered, and it must
+  // not turn every startup into "Availability refresh" error noise.
+  const localOnly = context.credential?.type !== "api_key" && key === LOCAL_GATEWAY_TOKEN;
 
   // Magpie accepts a gateway key in Bearer, x-api-key, or ?key=; avoid URL/log leakage.
   // Send X-Magpie-Deciders to include System One decision models, and X-Magpie-Prices for prices.
@@ -222,7 +254,7 @@ export const refreshMagpieModels = async (context: RefreshContext): Promise<Prov
     }
     catalog = await response.json();
   } catch (error) {
-    if (context.signal.aborted || cached.length > 0) return cached;
+    if (context.signal.aborted || cached.length > 0 || localOnly) return cached;
     throw error;
   }
   if (!isRecord(catalog) || !Array.isArray(catalog.data)) {
@@ -275,7 +307,7 @@ export const magpieChatProvider = {
   },
   api: "openai-completions",
   get apiKey() {
-    return resolveGatewayApiKeyEnvVar();
+    return resolveGatewayApiKeyEnvVar(getBaseUrl());
   },
   models: [],
   refreshModels: refreshMagpieModels,
